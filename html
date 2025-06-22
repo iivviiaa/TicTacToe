@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>超级井字棋</title>
+  <!-- 引入 Font Awesome 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <style>
+    /* 蓝色主题变量 */
+    :root {
+      --primary: #165DFF;
+      --primary-light: #4080FF;
+      --primary-dark: #0E42D2;
+      --player-color: #165DFF;
+      --computer-color: #FF7D00;
+      --winner-bg: #D6E4FF;
+      --winner-border: #0E42D2;
+      --active-bg: #E8F3FF;
+      --active-border: #165DFF;
+    }
+
+    /* 页面背景渐变 */
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #F5F7FA 0%, #E4ECFF 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      color: #333;
+    }
+    
+    /* 背景装饰元素 */
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      z-index: -1;
+    }
+    
+    body::before {
+      top: -100px;
+      right: -100px;
+      background: rgba(22, 93, 255, 0.1);
+    }
+    
+    body::after {
+      bottom: -100px;
+      left: -100px;
+      background: rgba(255, 125, 0, 0.05);
+    }
+    
+    h1 {
+      margin-bottom: 10px;
+      color: var(--primary);
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .score {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 20px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      justify-content: center;
+    }
+    
+    .player-score { color: var(--player-color); }
+    .computer-score { color: var(--computer-color); }
+    
+    .game-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .left-panel {
+      flex: 1 1 60%;
+      min-width: 300px;
+    }
+    
+    .right-panel {
+      flex: 1 1 30%;
+      min-width: 300px;
+    }
+    
+    .rule-box {
+      background: #fff;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: transform 0.3s ease;
+      font-size: 0.9rem;
+      height: fit-content;
+    }
+    
+    .rule-box:hover {
+      transform: translateY(-2px);
+    }
+    
+    .rule-box h3 {
+      margin-top: 0;
+      color: var(--primary);
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+    
+    .rule-box h3::before {
+      content: "📜";
+      margin-right: 10px;
+    }
+    
+    .rule-box ol {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.5;
+    }
+    
+    .rule-box li {
+      margin-bottom: 10px;
+    }
+    
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 25px;
+      justify-content: center;
+    }
+    
+    .control button {
+      padding: 10px 20px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .control button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+    }
+    
+    .control button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .hint {
+      font-size: 1rem;
+      color: #666;
+      font-weight: 500;
+    }
+    
+    /* 大棋盘样式：用 Grid 放 9 个小棋盘 */
+    #big-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding: 20px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      max-width: 800px;
+      width: 100%;
+      backdrop-filter: blur(8px);
+      background: rgba(255, 255, 255, 0.8);
+    }
+    
+    /* 小棋盘样式：用 Grid 放 9 个格子 */
+    .small-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 8px;
+      background: #F5F7FA;
+      border-radius: 10px;
+      padding: 8px;
+      aspect-ratio: 1/1;
+      transition: all 0.3s ease;
+    }
+    
+    .small-board:not(.winner):hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(22, 93, 255, 0.1);
+    }
+    
+    /* 活跃小棋盘样式（必须落子的小棋盘） */
+    .small-board.active {
+      background: var(--active-bg);
+      border: 2px solid var(--active-border);
+      animation: pulse-active 1.5s infinite;
+    }
+    
+    @keyframes pulse-active {
+      0% { box-shadow: 0 0 0 0 rgba(22, 93, 255, 0.2); }
+      70% { box-shadow: 0 0 0 6px rgba(22, 93, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(22, 93, 255, 0); }
+    }
+    
+    /* 格子样式 */
+    .cell {
+      background: #fff;
+      border: 2px solid #E5E7EB;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      aspect-ratio: 1/1;
+    }
+    
+    .cell:not(.disabled):hover {
+      background: #F0F2F5;
+      border-color: var(--primary-light);
+      transform: scale(1.05);
+    }
+    
+    /* 玩家标记样式 */
+    .cell.X .player-icon {
+      color: var(--player-color);
+      font-size: 2.5rem;
+    }
+    
+    .cell.O .computer-icon {
+      color: var(--computer-color);
+      font-size: 2.5rem;
+    }
+    
+    /* 禁用状态（已落子） */
+    .cell.disabled {
+      cursor: not-allowed;
+      background: #F5F7FA;
+    }
+    
+    /* 获胜小棋盘高亮 */
+    .small-board.winner {
+      background: var(--winner-bg);
+      border: 2px solid var(--winner-border);
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(22, 93, 255, 0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(22, 93, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(22, 93, 255, 0); }
+    }
+    
+    /* 响应式布局 */
+    @media (max-width: 1024px) {
+      .game-container {
+        flex-direction: column;
+      }
+      
+      .rule-box {
+        margin-bottom: 20px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      #big-board {
+        gap: 12px;
+        padding: 12px;
+      }
+      
+      .small-board {
+        gap: 5px;
+        padding: 5px;
+      }
+      
+      .cell.X .player-icon,
+      .cell.O .computer-icon {
+        font-size: 2rem;
+      }
+    }
+    
+    @media (max-width: 500px) {
+      .rule-box {
+        font-size: 0.8rem;
+      }
+      
+      #big-board {
+        gap: 8px;
+        padding: 8px;
+      }
+      
+      .small-board {
+        gap: 3px;
+        padding: 3px;
+      }
+      
+      .cell.X .player-icon,
+      .cell.O .computer-icon {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>超级井字棋</h1>
+  <div class="score">
+    <div class="player-score">玩家 (X)：<span id="player-score">0</span></div>
+    <div class="computer-score">电脑 (O)：<span id="computer-score">0</span></div>
+  </div>
+
+  <div class="game-container">
+    <div class="left-panel">
+      <div class="control">
+        <button id="restart-btn">重新开始</button>
+        <span id="hint" class="hint">点击小格子落子，下一回合需在对应小棋盘位置落子</span>
+      </div>
+
+      <!-- 大棋盘容器 -->
+      <div id="big-board"></div>
+    </div>
+    
+    <div class="right-panel">
+      <div class="rule-box">
+        <h3>游戏规则</h3>
+        <ol>
+          <li>游戏由 9 个小井字棋组成一个大棋盘，玩家使用 X，电脑使用 O。</li>
+          <li>玩家先手，在任意一个小棋盘的任意一格落子。之后，根据落子的位置，对手必须在对应的小棋盘中落子。</li>
+          <li>例如：你在某个小棋盘的右上角落子，你在下一回合只能在大棋盘中右上角的小棋盘里落子。</li>
+          <li>如果指定的小棋盘已经被填满或已有胜者，则可以在任意小棋盘落子。</li>
+          <li>一方在小棋盘内形成三子连线（横、竖、斜）时，该小棋盘按该方占领，并以高亮显示。</li>
+          <li>最终在大棋盘中形成三子连线（占领三个小棋盘）的一方获胜。</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 游戏核心状态
+    let game = {
+      bigBoard: Array(9).fill(null), // 记录每个小棋盘的胜者：'X'/'O'/null
+      smallBoards: Array(9).fill(null).map(() => Array(9).fill(null)), // 每个小棋盘的落子情况
+      currentPlayer: 'X', // 当前玩家：'X'（玩家） / 'O'（电脑）
+      activeSmall: -1, // 当前必须落子的小棋盘索引，-1 表示无限制
+      playerScore: 0,
+      computerScore: 0,
+      isOver: false
+    };
+
+    // DOM 元素缓存
+    const bigBoardEl = document.getElementById('big-board');
+    const playerScoreEl = document.getElementById('player-score');
+    const computerScoreEl = document.getElementById('computer-score');
+    const restartBtn = document.getElementById('restart-btn');
+    const hintEl = document.getElementById('hint');
+
+    // 初始化游戏（渲染棋盘 + 绑定事件）
+    function init() {
+      renderBoard();
+      restartBtn.addEventListener('click', restartGame);
+    }
+
+    // 渲染大棋盘（9 个小棋盘 + 每个小棋盘 9 个格子）
+    function renderBoard() {
+      bigBoardEl.innerHTML = ''; // 清空旧棋盘
+      for (let smallIndex = 0; smallIndex < 9; smallIndex++) {
+        const smallBoardEl = document.createElement('div');
+        smallBoardEl.className = 'small-board';
+        smallBoardEl.dataset.index = smallIndex;
+
+        // 检查是否是当前活跃的小棋盘
+        if (game.activeSmall === smallIndex && game.currentPlayer === 'X') {
+          smallBoardEl.classList.add('active');
+        }
+
+        for (let cellIndex = 0; cellIndex < 9; cellIndex++) {
+          const cellEl = document.createElement('div');
+          cellEl.className = 'cell';
+          cellEl.dataset.small = smallIndex;
+          cellEl.dataset.cell = cellIndex;
+          cellEl.addEventListener('click', handleCellClick);
+          
+          // 恢复已落子的状态
+          if (game.smallBoards[smallIndex][cellIndex]) {
+            if (game.smallBoards[smallIndex][cellIndex] === 'X') {
+              cellEl.innerHTML = '<i class="fa fa-times player-icon"></i>'; // 修改为 Font Awesome 4.x 兼容的图标类名
+            } else {
+              cellEl.innerHTML = '<i class="fa fa-circle computer-icon"></i>'; // 修改为 Font Awesome 4.x 兼容的图标类名
+            }
+            cellEl.classList.add('disabled');
+          }
+          
+          smallBoardEl.appendChild(cellEl);
+        }
+        
+        // 恢复已获胜的小棋盘状态
+        if (game.bigBoard[smallIndex]) {
+          smallBoardEl.classList.add('winner');
+        }
+        
+        bigBoardEl.appendChild(smallBoardEl);
+      }
+    }
+
+    // 处理玩家点击落子
+    function handleCellClick(e) {
+      if (game.isOver || game.currentPlayer !== 'X') return; // 游戏结束或非玩家回合，不响应
+
+      const cellEl = e.target;
+      const smallIndex = parseInt(cellEl.dataset.small);
+      const cellIndex = parseInt(cellEl.dataset.cell);
+
+      // 检查是否必须在指定小棋盘落子
+      if (game.activeSmall !== -1 && game.activeSmall !== smallIndex) {
+        showNotification('需在指定小棋盘落子！', 'error');
+        return;
+      }
+      // 检查该位置是否已落子或小棋盘已分胜负
+      if (game.smallBoards[smallIndex][cellIndex] || game.bigBoard[smallIndex]) {
+        showNotification('该位置不可落子！', 'error');
+        return;
+      }
+
+      // 玩家落子（X）
+      game.smallBoards[smallIndex][cellIndex] = 'X';
+      cellEl.innerHTML = '<i class="fa fa-times player-icon"></i>'; // 修改为 Font Awesome 4.x 兼容的图标类名
+      cellEl.classList.add('disabled');
+      
+      // 添加落子动画
+      const icon = cellEl.querySelector('.player-icon');
+      icon.style.transform = 'scale(0)';
+      icon.style.opacity = '0';
+      setTimeout(() => {
+        icon.style.transition = 'all 0.3s ease';
+        icon.style.transform = 'scale(1)';
+        icon.style.opacity = '1';
+      }, 10);
+
+      // 检查当前小棋盘是否分胜负
+      const smallWinner = checkSmallWinner(smallIndex);
+      if (smallWinner) {
+        game.bigBoard[smallIndex] = smallWinner;
+        // 高亮获胜小棋盘
+        const smallBoardEl = bigBoardEl.children[smallIndex];
+        smallBoardEl.classList.add('winner');
+        // 检查大棋盘是否分胜负
+        const bigWinner = checkBigWinner();
+        if (bigWinner) {
+          game.isOver = true;
+          game.playerScore++;
+          playerScoreEl.textContent = game.playerScore;
+          showNotification('恭喜，你赢了！', 'success');
+          return;
+        }
+      }
+
+      // 更新下一个必须落子的小棋盘
+      const nextSmall = cellIndex;
+      if (game.bigBoard[nextSmall] || isSmallBoardFull(nextSmall)) {
+        game.activeSmall = -1;
+        hintEl.textContent = '指定小棋盘不可用，可任意选择小棋盘落子';
+      } else {
+        game.activeSmall = nextSmall;
+        hintEl.textContent = `下一回合需在小棋盘 ${nextSmall} 落子`;
+      }
+
+      // 切换到电脑回合
+      game.currentPlayer = 'O';
+      updateTurnIndicator();
+      // 重新渲染棋盘，更新活跃小棋盘状态
+      renderBoard();
+      // 电脑延迟落子（模拟思考）
+      setTimeout(computerMove, 800);
+    }
+
+    // 电脑落子逻辑（简单随机，可优化为智能算法）
+    function computerMove() {
+      if (game.isOver || game.currentPlayer !== 'O') return;
+
+      let availableMoves = [];
+
+      // 优先检查 activeSmall
+      if (game.activeSmall !== -1) {
+        const smallIndex = game.activeSmall;
+        if (!game.bigBoard[smallIndex] && !isSmallBoardFull(smallIndex)) {
+          // 检查是否有能赢的位置
+          const winningMove = findWinningMove(smallIndex, 'O');
+          if (winningMove !== -1) {
+            availableMoves.push({ small: smallIndex, cell: winningMove });
+          } else {
+            // 检查是否需要防守
+            const blockingMove = findWinningMove(smallIndex, 'X');
+            if (blockingMove !== -1) {
+              availableMoves.push({ small: smallIndex, cell: blockingMove });
+            } else {
+              // 选择最优位置（中心优先，角落其次，边缘最后）
+              const preferredMoves = [4, 0, 2, 6, 8, 1, 3, 5, 7];
+              for (const move of preferredMoves) {
+                if (!game.smallBoards[smallIndex][move]) {
+                  availableMoves.push({ small: smallIndex, cell: move });
+                  break;
+                }
+              }
+            }
+          }
+          
+          // 如果没有找到最优位置，添加所有可用位置
+          if (availableMoves.length === 0) {
+            for (let cell = 0; cell < 9; cell++) {
+              if (!game.smallBoards[smallIndex][cell]) {
+                availableMoves.push({ small: smallIndex, cell });
+              }
+            }
+          }
+        }
+      }
+
+      // 如果 activeSmall 不可用，遍历所有小棋盘找位置
+      if (availableMoves.length === 0) {
+        for (let small = 0; small < 9; small++) {
+          if (game.bigBoard[small] || isSmallBoardFull(small)) continue;
+          
+          // 检查是否有能赢的小棋盘
+          const winningMove = findWinningMove(small, 'O');
+          if (winningMove !== -1) {
+            availableMoves.push({ small, cell: winningMove });
+            break;
+          }
+          
+          // 检查是否需要防守
+          const blockingMove = findWinningMove(small, 'X');
+          if (blockingMove !== -1) {
+            availableMoves.push({ small, cell: blockingMove });
+            break;
+          }
+          
+          // 收集所有可用位置
+          for (let cell = 0; cell < 9; cell++) {
+            if (!game.smallBoards[small][cell]) {
+              availableMoves.push({ small, cell });
+            }
+          }
+        }
+      }
+
+      // 无可用位置（理论上不会，因为游戏没结束）
+      if (availableMoves.length === 0) {
+        showNotification('平局！', 'info');
+        game.isOver = true;
+        return;
+      }
+
+      // 随机选一个位置落子
+      const randomMove = availableMoves[0]; // 已经按优先级排序，选第一个
+      const smallIndex = randomMove.small;
+      const cellIndex = randomMove.cell;
+      game.smallBoards[smallIndex][cellIndex] = 'O';
+      const cellEl = Array.from(bigBoardEl.children[smallIndex].children)[cellIndex];
+      cellEl.innerHTML = '<i class="fa fa-circle computer-icon"></i>'; // 修改为 Font Awesome 4.x 兼容的图标类名
+      cellEl.classList.add('disabled');
+      
+      // 添加落子动画
+      const icon = cellEl.querySelector('.computer-icon');
+      icon.style.transform = 'scale(0)';
+      icon.style.opacity = '0';
+      setTimeout(() => {
+        icon.style.transition = 'all 0.3s ease';
+        icon.style.transform = 'scale(1)';
+        icon.style.opacity = '1';
+      }, 10);
+
+      // 检查当前小棋盘是否分胜负
+      const smallWinner = checkSmallWinner(smallIndex);
+      if (smallWinner) {
+        game.bigBoard[smallIndex] = smallWinner;
+        const smallBoardEl = bigBoardEl.children[smallIndex];
+        smallBoardEl.classList.add('winner');
+        // 检查大棋盘是否分胜负
+        const bigWinner = checkBigWinner();
+        if (bigWinner) {
+          game.isOver = true;
+          game.computerScore++;
+          computerScoreEl.textContent = game.computerScore;
+          showNotification('电脑赢了！', 'error');
+          return;
+        }
+      }
+
+      // 更新下一个必须落子的小棋盘
+      const nextSmall = cellIndex;
+      if (game.bigBoard[nextSmall] || isSmallBoardFull(nextSmall)) {
+        game.activeSmall = -1;
+        hintEl.textContent = '指定小棋盘不可用，可任意选择小棋盘落子';
+      } else {
+        game.activeSmall = nextSmall;
+        hintEl.textContent = `下一回合需在小棋盘 ${nextSmall} 落子`;
+      }
+
+      // 切换回玩家回合
+      game.currentPlayer = 'X';
+      updateTurnIndicator();
+      // 重新渲染棋盘，更新活跃小棋盘状态
+      renderBoard();
+    }
+
+    // 寻找能赢的位置
+    function findWinningMove(smallIndex, player) {
+      const board = game.smallBoards[smallIndex];
+      const winLines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // 竖
+        [0, 4, 8], [2, 4, 6] // 斜
+      ];
+      
+      for (const line of winLines) {
+        const [a, b, c] = line;
+        if (board[a] === player && board[b] === player && !board[c]) {
+          return c;
+        }
+        if (board[a] === player && board[c] === player && !board[b]) {
+          return b;
+        }
+        if (board[b] === player && board[c] === player && !board[a]) {
+          return a;
+        }
+      }
+      return -1; // 没有找到能赢的位置
+    }
+
+    // 检查小棋盘是否有胜者（三子连线）
+    function checkSmallWinner(smallIndex) {
+      const board = game.smallBoards[smallIndex];
+      // 所有可能的获胜组合
+      const winLines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // 竖
+        [0, 4, 8], [2, 4, 6] // 斜
+      ];
+      for (const line of winLines) {
+        const [a, b, c] = line;
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return board[a];
+        }
+      }
+      return null;
+    }
+
+    // 检查大棋盘是否有胜者（占领三个小棋盘）
+    function checkBigWinner() {
+      const board = game.bigBoard;
+      const winLines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // 竖
+        [0, 4, 8], [2, 4, 6] // 斜
+      ];
+      for (const line of winLines) {
+        const [a, b, c] = line;
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return board[a];
+        }
+      }
+      // 检查是否所有小棋盘都分胜负（平局）
+      if (board.every(winner => winner !== null)) {
+        showNotification('平局！', 'info');
+        game.isOver = true;
+      }
+      return null;
+    }
+
+    // 检查小棋盘是否已满
+    function isSmallBoardFull(smallIndex) {
+      return game.smallBoards[smallIndex].every(cell => cell !== null);
+    }
+
+    // 重新开始游戏
+    function restartGame() {
+      game = {
+        bigBoard: Array(9).fill(null),
+        smallBoards: Array(9).fill(null).map(() => Array(9).fill(null)),
+        currentPlayer: 'X',
+        activeSmall: -1,
+        playerScore: game.playerScore, // 保留分数
+        computerScore: game.computerScore,
+        isOver: false
+      };
+      renderBoard();
+      hintEl.textContent = '点击小格子落子，下一回合需在对应小棋盘位置落子';
+      updateTurnIndicator();
+    }
+
+    // 更新回合指示器
+    function updateTurnIndicator() {
+      hintEl.style.color = game.currentPlayer === 'X' ? '#165DFF' : '#FF7D00';
+    }
+
+    // 显示通知
+    function showNotification(message, type = 'info') {
+      // 创建通知元素
+      const notification = document.createElement('div');
+      notification.className = 'notification';
+      notification.textContent = message;
+      
+      // 根据类型设置样式
+      if (type === 'success') {
+        notification.style.backgroundColor = '#22C55E';
+      } else if (type === 'error') {
+        notification.style.backgroundColor = '#EF4444';
+      } else if (type === 'info') {
+        notification.style.backgroundColor = '#3B82F6';
+      }
+      
+      // 添加到页面
+      document.body.appendChild(notification);
+      
+      // 设置动画和自动消失
+      setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+      }, 10);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 3000);
+    }
+
+    // 添加通知样式
+    const style = document.createElement('style');
+    style.textContent = `
+      .notification {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 100;
+        opacity: 0;
+        transition: all 0.3s ease;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // 页面加载后初始化
+    window.onload = function() {
+      init();
+      updateTurnIndicator();
+    };
+  </script>
+</body>
+</html>
